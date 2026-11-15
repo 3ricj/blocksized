@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grid Zero-Block Simulator</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <h1>Grid Zero-Block Simulator</h1>
+  <div class="controls">
+    <label>Rows <input id="inp-rows" type="number" min="1" max="40" value="8"></label>
+    <label>Cols <input id="inp-cols" type="number" min="1" max="40" value="8"></label>
+    <button id="btn-rebuild">Apply size</button>
+    <button id="btn-clear">Clear</button>
+    <button id="btn-random" title="Place one 1 per row/col (only possible for square grids)">Random valid</button>
+    <label class="chk"><input id="chk-tint" type="checkbox" checked> Tint blocks</label>
+  </div>
+</header>
+
+<main>
+  <div id="grid-wrap" class="grid-wrap">
+    <table id="grid-table"></table>
+    <svg id="block-overlay" aria-hidden="true"></svg>
+  </div>
+  <p id="hint" class="hint"></p>
+</main>
+
+<footer id="statusbar">
+  <span id="tally" class="tally">Block tally: 0</span>
+  <span id="validity" class="validity"></span>
+</footer>
+
+<script src="grid.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
