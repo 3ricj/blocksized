@@ -7,10 +7,12 @@
  *  - Every cell holds 0 or 1.
  *  - A row/column is *valid* only when it contains exactly one 1
  *    (0 ones = insufficient, 2+ ones = too many).
- *  - Score = number of 4-connected components of 0s (diagonal contact
- *    does not make cells contiguous). The score is computed for any
- *    state, but it only counts as a valid score when every row and
- *    column is valid.
+ *  - Score = number of rectangular blocks the zeros tile into. Blocks are
+ *    always rectangles: a zero region is partitioned by a top-down scan into
+ *    maximal rectangles (a horizontal run of zeros keeps extending downward
+ *    while the span is unchanged; new rectangles open at split edges).
+ *    The score is computed for any state, but it only counts as a valid
+ *    score when every row and column is valid.
  */
 
 function createGrid(rows, cols, fill = 0) {
@@ -27,9 +29,15 @@ function toggleCell(grid, r, c) {
 }
 
 /**
- * Analyze the grid in one pass:
+ * Analyze the grid:
  *  - per-row/column one-counts and validity flags,
- *  - flood-fill of the 0 regions into blocks (plus a blockAt lookup map).
+ *  - rectangle partition of the zeros into maximal blocks (top-down greedy
+ *    scan) plus a blockAt lookup map.
+ *
+ * Partition rule: a block starts at each maximal run of unclaimed zeros in
+ * a row and extends downward for as long as a row covers its full column
+ * span (extra zeros in that row open sibling blocks). Deterministic; each
+ * zero belongs to exactly one rectangle.
  */
 function analyzeGrid(grid) {
   const rows = grid.length;
@@ -53,37 +61,38 @@ function analyzeGrid(grid) {
 
   const blockAt = Array.from({ length: rows }, () => new Array(cols).fill(-1));
   const blocks = [];
-  const stack = [];
+  let open = []; // { block, c1, c2 } — blocks that may still extend downward
+
   for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (grid[r][c] !== 0 || blockAt[r][c] !== -1) continue;
-      const id = blocks.length;
-      const cells = [];
-      let minR = r, maxR = r, minC = c, maxC = c;
-      blockAt[r][c] = id;
-      stack.push([r, c]);
-      while (stack.length) {
-        const [cr, cc] = stack.pop();
-        cells.push([cr, cc]);
-        if (cr < minR) minR = cr;
-        if (cr > maxR) maxR = cr;
-        if (cc < minC) minC = cc;
-        if (cc > maxC) maxC = cc;
-        if (cr > 0 && grid[cr - 1][cc] === 0 && blockAt[cr - 1][cc] === -1) {
-          blockAt[cr - 1][cc] = id; stack.push([cr - 1, cc]);
-        }
-        if (cr + 1 < rows && grid[cr + 1][cc] === 0 && blockAt[cr + 1][cc] === -1) {
-          blockAt[cr + 1][cc] = id; stack.push([cr + 1, cc]);
-        }
-        if (cc > 0 && grid[cr][cc - 1] === 0 && blockAt[cr][cc - 1] === -1) {
-          blockAt[cr][cc - 1] = id; stack.push([cr, cc - 1]);
-        }
-        if (cc + 1 < cols && grid[cr][cc + 1] === 0 && blockAt[cr][cc + 1] === -1) {
-          blockAt[cr][cc + 1] = id; stack.push([cr, cc + 1]);
-        }
+    const stillOpen = [];
+    for (const o of open) {
+      let extendsDown = true;
+      for (let c = o.c1; c <= o.c2; c++) {
+        if (grid[r][c] !== 0 || blockAt[r][c] !== -1) { extendsDown = false; break; }
       }
-      blocks.push({ id, cells, minR, maxR, minC, maxC });
+      if (!extendsDown) continue; // block closes at row r-1
+      for (let c = o.c1; c <= o.c2; c++) {
+        blockAt[r][c] = o.block.id;
+        o.block.cells.push([r, c]);
+      }
+      o.block.maxR = r;
+      stillOpen.push(o);
     }
+
+    let c = 0;
+    while (c < cols) {
+      if (grid[r][c] !== 0 || blockAt[r][c] !== -1) { c++; continue; }
+      const start = c;
+      while (c < cols && grid[r][c] === 0 && blockAt[r][c] === -1) c++;
+      const block = { id: blocks.length, cells: [], minR: r, maxR: r, minC: start, maxC: c - 1 };
+      for (let cc = start; cc < c; cc++) {
+        blockAt[r][cc] = block.id;
+        block.cells.push([r, cc]);
+      }
+      blocks.push(block);
+      stillOpen.push({ block, c1: start, c2: c - 1 });
+    }
+    open = stillOpen;
   }
 
   return {

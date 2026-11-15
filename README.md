@@ -7,8 +7,10 @@ A binary grid (rows x cols, configurable at init and via the header controls):
 - **Validity:** every row and every column must contain *exactly one* `1`.
   Rows/columns with zero or multiple ones get a red background (small `R`/`C`
   badges mark which check failed; dark red = both).
-- **Score:** number of 4-connected blocks of `0`s (edge-contiguous; diagonal
-  contact does not merge). A lone zero ringed by ones counts as one block.
+- **Score:** number of rectangular (or square) blocks the `0`s tile into.
+  Blocks are always rectangles: a zero region that bends is partitioned into
+  maximal rectangles by a deterministic top-down scan, so every zero belongs
+  to exactly one block. A lone zero ringed by ones counts as one block.
   The tally is shown in the footer at all times, but is flagged
   "score doesn't count" while the grid is invalid.
 

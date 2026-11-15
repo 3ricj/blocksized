@@ -16,23 +16,22 @@ function gridFromStrings(lines) {
   assert.equal(a.invalidCols, 5);
 }
 
-// --- single 1 in a 3x3: splits the zeros into 4 corner blocks? No: they connect around ---
+// --- single 1 in a 3x3: zero ring splits into top bar, left, right, bottom bar ---
 {
   const g = gridFromStrings(["000", "010", "000"]);
   const a = analyzeGrid(g);
-  assert.equal(a.tally, 1, "ring of zeros stays one block");
+  assert.equal(a.tally, 4, "ring of zeros = 4 rectangles");
   assert.equal(a.valid, false); // outer row/col have no ones
 }
 
-// --- full valid permutation grid (identity): 3 separate zero regions ---
+// --- full valid permutation grid (identity): 4 zero rectangles ---
 {
   const g = gridFromStrings(["100", "010", "001"]);
   const a = analyzeGrid(g);
   assert.equal(a.valid, true);
   assert.deepEqual(a.rowOnes, [1, 1, 1]);
   assert.deepEqual(a.colOnes, [1, 1, 1]);
-  // zeros: top-right triangle and bottom-left triangle are each one 4-connected region
-  assert.equal(a.tally, 2);
+  assert.equal(a.tally, 4);
 }
 
 // --- single zero surrounded by ones counts as one block ---
@@ -72,14 +71,46 @@ function gridFromStrings(lines) {
   assert.equal(a.valid, false);
 }
 
-// --- blocks expose bounding boxes ---
+// --- every block is a solid rectangle; wide-L splits into 4 rectangles ---
 {
   const g = gridFromStrings(["0000", "0110", "0000"]);
   const a = analyzeGrid(g);
-  assert.equal(a.tally, 1);
-  const b = a.blocks[0];
-  assert.deepEqual([b.minR, b.maxR, b.minC, b.maxC], [0, 2, 0, 3]);
-  assert.equal(b.cells.length, 10); // 12 cells - 2 ones
+  assert.equal(a.tally, 4); // top bar, two side 2x1s, bottom middle bar
+  for (const b of a.blocks) {
+    const area = (b.maxR - b.minR + 1) * (b.maxC - b.minC + 1);
+    assert.equal(b.cells.length, area, "block must be a full rectangle");
+  }
+}
+
+// --- fuzz: random grids always tile zeros exactly once, in solid rectangles ---
+{
+  let seed = 12345;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  for (let t = 0; t < 200; t++) {
+    const rows = 1 + Math.floor(rnd() * 8), cols = 1 + Math.floor(rnd() * 8);
+    const g = createGrid(rows, cols);
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++) g[r][c] = rnd() < 0.4 ? 1 : 0;
+    const a = analyzeGrid(g);
+    let zeros = 0;
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++) {
+        if (g[r][c] === 1) { assert.equal(a.blockAt[r][c], -1); continue; }
+        zeros++;
+        assert.ok(a.blockAt[r][c] >= 0 && a.blockAt[r][c] < a.tally);
+      }
+    let covered = 0;
+    for (const b of a.blocks) {
+      const area = (b.maxR - b.minR + 1) * (b.maxC - b.minC + 1);
+      assert.equal(b.cells.length, area);
+      for (const [r, c] of b.cells) {
+        assert.equal(a.blockAt[r][c], b.id);
+        assert.ok(r >= b.minR && r <= b.maxR && c >= b.minC && c <= b.maxC);
+      }
+      covered += b.cells.length;
+    }
+    assert.equal(covered, zeros, "every zero claimed exactly once");
+  }
 }
 
 // --- blockAt covers every zero exactly once, ones get -1 ---
